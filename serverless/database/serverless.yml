@@ -1,0 +1,21 @@
+service: database
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  region: ap-southeast-1
+  runtime: nodejs18.x
+  environment:
+    DB_HOST: not_provided
+    DB_USER: not_provided
+    DB_PASSWORD: not_provided
+    DB_NAME: not_provided
+
+functions:
+  aggregator:
+    handler: handlers/aggregator.handler
+    events:
+      - sqs: not_provided
+      - httpApi:
+          path: /test
+          method: get

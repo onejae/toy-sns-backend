@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  bl-api:
+    env_file:
+      - ./aws-sec.env
+    image: bl-api
+    working_dir: /usr/src/app
+    user: "root"
+    command:
+      ["node", "dist/index.js"]
+    ports:
+      - 8080:8080
+    deploy:
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 1500M

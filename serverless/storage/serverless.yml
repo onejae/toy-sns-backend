@@ -1,0 +1,104 @@
+service: storage
+frameworkVersion: '3'
+
+useDotenv: true
+
+provider:
+  name: aws
+  region: ap-southeast-1
+
+custom:
+  IMAGE_BUCKET_ORIGINAL: bl-image-original
+  IMAGE_BUCKET_SERVE: bl-image-serve
+  AWS_ACCOUNT_ID: not_provided
+plugins:
+  - serverless-offline
+  - serverless-offline-sqs
+
+functions:
+  resizeImage:
+    handler: handler.resizeImage
+    environment:
+      SOURCE_BUCKET: ${self:custom.IMAGE_BUCKET_ORIGINAL}
+      DEST_BUCKET: ${self:custom.IMAGE_BUCKET_SERVE}
+    events:
+      - s3:
+          bucket: ${self:custom.IMAGE_BUCKET_ORIGINAL}
+          event: s3:ObjectCreated:*
+          existing: true
+resources:
+  Outputs:
+    CloudFrontDist:
+      Value:
+        Ref: CloudFrontDistribution
+    S3BucketName:
+      Value:
+        Ref: ImageToServe
+
+  Resources:
+    ImageOriginal:
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        BucketName: ${self:custom.IMAGE_BUCKET_ORIGINAL}
+    ImageToServe:
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        BucketName: ${self:custom.IMAGE_BUCKET_SERVE}
+    CloudFrontOriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
+      Properties:
+        OriginAccessControlConfig:
+          Description: 'origin access control(OAC) for allowing cloudfront to access S3 bucket'
+          Name: static-hosting-OAC
+          OriginAccessControlOriginType: s3
+          SigningBehavior: always
+          SigningProtocol: sigv4
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      DependsOn:
+        - ImageToServe
+      Properties:
+        DistributionConfig:
+          Origins:
+            - DomainName: !Sub '${self:custom.IMAGE_BUCKET_SERVE}.s3.ap-southeast-1.amazonaws.com'
+              Id: static-hosting
+              S3OriginConfig:
+                OriginAccessIdentity: ''
+              OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+          Enabled: 'true'
+          DefaultRootObject: fallback.jpg
+          CustomErrorResponses:
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /fallback.jpg
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /fallback.jpg
+          HttpVersion: http2
+          DefaultCacheBehavior:
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            Compress: true
+            TargetOriginId: static-hosting
+            ForwardedValues:
+              QueryString: 'false'
+              Cookies:
+                Forward: none
+            ViewerProtocolPolicy: allow-all
+    BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: ${self:custom.IMAGE_BUCKET_SERVE}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: 'cloudfront.amazonaws.com'
+              Action: 's3:GetObject'
+              Resource: !Sub 'arn:aws:s3:::${self:custom.IMAGE_BUCKET_SERVE}/*'
+              Condition:
+                StringEquals:
+                  AWS:SourceArn: !Sub 'arn:aws:cloudfront::${self:custom.AWS_ACCOUNT_ID}:distribution/${CloudFrontDistribution}'
