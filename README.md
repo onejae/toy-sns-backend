@@ -140,21 +140,21 @@ $ docker run --network host -d --env-file aws-sec.env bl-api-test
 
        ```yml
        build:
-       stage: build
-       image: node:18
-       script:
-           - npm install --omit=dev
-       artifacts:
-           paths:
-           - "\*"
-       tags:
-       - {specify your runner}
+        stage: build
+        image: node:18
+        script:
+            - npm install --omit=dev
+        artifacts:
+            paths:
+                - "\*"
+        tags:
+        - {specify your runner}
        deploy:
-       stage: deploy
-       image: amaysim/serverless:3.35.2
-       script:
-           - serverless deploy
-       tags: - {specify your runner}
+        stage: deploy
+        image: amaysim/serverless:3.35.2
+        script:
+            - serverless deploy
+        tags: - {specify your runner}
        ```
 
 3.  Deploy API Servers
